@@ -1,184 +1,424 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { ArrowLeft, TrendingDown, TrendingUp, Zap, ChevronRight, Check } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Smartphone, 
+  Zap, 
+  Sparkles,
+  Tv,
+  Music,
+  Gamepad2,
+  Trophy,
+  Bot,
+  Check,
+  RotateCcw
+} from 'lucide-react';
+import { BottomNav } from '@/components/BottomNav';
+import { PackageCard } from '@/components/PackageCard';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { toast } from 'sonner';
+import { 
+  getData, 
+  saveData, 
+  calculatePackagePrice, 
+  getAIPackageSuggestion,
+  CustomPackage 
+} from '@/lib/storage';
 
-const packages = [
+const standardPackages = [
   {
-    id: 1,
-    name: 'Premium Light',
-    price: '51,90€',
-    savings: '8€/mesec',
-    recommended: true,
-    features: ['150+ TV kanalov', 'HBO Max', '300 Mbit/s', 'Neomejeni klici'],
+    name: 'ZConnect S',
+    price: 14.99,
+    data: 20,
+    calls: '100',
+    features: ['20 GB podatkov', '100 minut klicev', '100 SMS', 'Osnovna podpora'],
   },
   {
-    id: 2,
-    name: 'Premium',
-    price: '59,90€',
-    current: true,
-    features: ['200+ TV kanalov', 'HBO Max, Netflix, Disney+', '500 Mbit/s', 'Neomejeni klici'],
+    name: 'ZConnect M',
+    price: 24.99,
+    data: 50,
+    calls: '300',
+    features: ['50 GB podatkov', '300 minut klicev', 'Neomejeni SMS', 'Prioritetna podpora'],
+    isPopular: true,
   },
   {
-    id: 3,
-    name: 'Premium Max',
-    price: '79,90€',
-    features: ['250+ TV kanalov', 'Vse streaming platforme', '1 Gbit/s', 'Neomejeni klici', '5G mobilni podatki'],
+    name: 'ZConnect L',
+    price: 39.99,
+    data: 100,
+    calls: 'neomejeno',
+    features: ['100 GB podatkov', 'Neomejeni klici', 'Neomejeni SMS', 'Premium podpora'],
   },
 ];
 
-const usageData = [
-  { label: 'TV vsebine', used: 23, total: 'ur', trend: 'up', change: '+12%' },
-  { label: 'Internet', used: 45, total: '100 GB', trend: 'down', change: '-5%' },
-  { label: 'Streaming', used: 30, total: 'GB', trend: 'up', change: '+20%' },
+const dataOptions = [
+  { value: 20, label: '20 GB' },
+  { value: 50, label: '50 GB' },
+  { value: 100, label: '100 GB' },
+  { value: 200, label: '200 GB' },
 ];
 
-export default function Packages() {
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
+const callsOptions = [
+  { value: '100', label: '100 minut' },
+  { value: '300', label: '300 minut' },
+  { value: 'neomejeno', label: 'Neomejeno' },
+];
+
+export const Package = () => {
+  const [view, setView] = useState<'packages' | 'custom'>('packages');
+  const [data] = useState(getData());
+  const [customPkg, setCustomPkg] = useState<CustomPackage>(data.package);
+  const [aiDescription, setAiDescription] = useState('');
+  const [showAiResult, setShowAiResult] = useState(false);
+
+  const updateCustomPackage = (updates: Partial<CustomPackage>) => {
+    const newPkg = { ...customPkg, ...updates };
+    newPkg.price = calculatePackagePrice(newPkg);
+    setCustomPkg(newPkg);
   };
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
+  const saveCustomPackage = () => {
+    const allData = getData();
+    allData.package = customPkg;
+    saveData(allData);
+    toast.success('Paket shranjen!', {
+      description: 'Vaš ZConnect Custom paket je posodobljen.',
+    });
+  };
+
+  const resetPackage = () => {
+    const defaultPkg: CustomPackage = {
+      data: 50,
+      calls: '300',
+      tvPackage: false,
+      musicPackage: false,
+      aiPackage: false,
+      gamingPackage: false,
+      sportsPackage: false,
+      price: 19.98,
+    };
+    setCustomPkg(defaultPkg);
+    toast.info('Paket ponastavljen');
+  };
+
+  const generateAISuggestion = () => {
+    const suggestion = getAIPackageSuggestion(aiDescription, data.profile.interests);
+    const newPkg = { 
+      ...customPkg, 
+      ...suggestion,
+      price: calculatePackagePrice({ ...customPkg, ...suggestion })
+    };
+    setCustomPkg(newPkg);
+    setShowAiResult(true);
+    toast.success('AI predlog pripravljen!', {
+      description: 'Preverite prilagojene nastavitve.',
+    });
+  };
+
+  const getPackageSummary = () => {
+    const parts = [`${customPkg.data} GB podatkov`];
+    if (customPkg.calls === 'neomejeno') {
+      parts.push('neomejeni klici');
+    } else {
+      parts.push(`${customPkg.calls} minut klicev`);
+    }
+    if (customPkg.tvPackage) parts.push('TV paket');
+    if (customPkg.musicPackage) parts.push('glasbeni paket');
+    if (customPkg.aiPackage) parts.push('AI pomočnik');
+    if (customPkg.gamingPackage) parts.push('gaming paket');
+    if (customPkg.sportsPackage) parts.push('športni paket');
+    
+    return `Vaš paket vključuje ${parts.join(', ')}.`;
   };
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="min-h-screen bg-background px-5 py-6"
-    >
+    <div className="min-h-screen bg-background pb-24">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Link to="/home">
-          <motion.div whileTap={{ scale: 0.95 }} className="p-2 -ml-2 rounded-xl hover:bg-secondary">
-            <ArrowLeft className="w-5 h-5 text-foreground" />
-          </motion.div>
-        </Link>
-        <div>
-          <h1 className="text-xl font-display font-bold">AI Predlogi paketov</h1>
-          <p className="text-sm text-muted-foreground">Prilagojeno vaši porabi</p>
+      <div className="px-5 pt-12 pb-6">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h1 className="text-2xl font-bold">Paketi</h1>
+          <p className="text-muted-foreground">Izberite ali ustvarite svoj paket</p>
+        </motion.div>
+
+        {/* View Toggle */}
+        <div className="flex gap-2 mt-4">
+          <Button
+            variant={view === 'packages' ? 'default' : 'outline'}
+            onClick={() => setView('packages')}
+            className={view === 'packages' ? 'gradient-primary' : ''}
+          >
+            <Smartphone className="w-4 h-4 mr-2" />
+            Paketi
+          </Button>
+          <Button
+            variant={view === 'custom' ? 'default' : 'outline'}
+            onClick={() => setView('custom')}
+            className={view === 'custom' ? 'gradient-primary' : ''}
+          >
+            <Zap className="w-4 h-4 mr-2" />
+            ZConnect Custom
+          </Button>
         </div>
       </div>
 
-      {/* AI Analysis card */}
-      <motion.div
-        variants={itemVariants}
-        className="p-5 rounded-3xl glass-card border border-primary/20 mb-6"
-      >
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-2xl gradient-bg flex items-center justify-center">
-            <Zap className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h3 className="font-display font-semibold">AI Analiza</h3>
-            <p className="text-xs text-muted-foreground">Posodobljeno danes</p>
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground mb-4">
-          Na podlagi vaše uporabe zadnjih 30 dni smo analizirali vaš vzorec gledanja in uporabe interneta.
-          <span className="text-primary font-medium"> Lahko bi prihranili 8€ mesečno</span> z bolj prilagojenim paketom.
-        </p>
-        <div className="grid grid-cols-3 gap-3">
-          {usageData.map((data) => (
-            <div key={data.label} className="text-center p-3 bg-secondary/50 rounded-xl">
-              <p className="text-2xl font-display font-bold">{data.used}</p>
-              <p className="text-xs text-muted-foreground">{data.total}</p>
-              <div className={`flex items-center justify-center gap-1 mt-1 text-xs ${
-                data.trend === 'up' ? 'text-success' : 'text-primary'
-              }`}>
-                {data.trend === 'up' ? (
-                  <TrendingUp className="w-3 h-3" />
-                ) : (
-                  <TrendingDown className="w-3 h-3" />
-                )}
-                {data.change}
-              </div>
-            </div>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* Package recommendations */}
-      <motion.div variants={itemVariants} className="space-y-4">
-        <h2 className="font-display font-semibold text-lg">Priporočeni paketi</h2>
-        
-        {packages.map((pkg) => (
-          <motion.div
-            key={pkg.id}
-            whileTap={{ scale: 0.98 }}
-            className={`p-5 rounded-2xl border-2 transition-all ${
-              pkg.recommended
-                ? 'border-primary bg-primary/5'
-                : pkg.current
-                ? 'border-border bg-card'
-                : 'border-border bg-card'
-            }`}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-display font-bold text-lg">{pkg.name}</h3>
-                  {pkg.recommended && (
-                    <span className="px-2 py-0.5 text-xs font-medium bg-primary text-primary-foreground rounded-full">
-                      Priporočeno
-                    </span>
-                  )}
-                  {pkg.current && (
-                    <span className="px-2 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground rounded-full">
-                      Trenutni
-                    </span>
-                  )}
-                </div>
-                {pkg.savings && (
-                  <p className="text-success text-sm font-medium mt-1">
-                    Prihranek: {pkg.savings}
-                  </p>
-                )}
-              </div>
-              <p className="text-2xl font-display font-bold">{pkg.price}</p>
-            </div>
-            
-            <div className="space-y-2 mb-4">
-              {pkg.features.map((feature, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm">
-                  <Check className="w-4 h-4 text-success" />
-                  <span className="text-muted-foreground">{feature}</span>
-                </div>
-              ))}
-            </div>
-
-            <Button
-              className={`w-full rounded-xl ${
-                pkg.recommended ? 'gradient-bg text-white' : ''
-              }`}
-              variant={pkg.recommended ? 'default' : 'outline'}
+      <div className="px-5">
+        <AnimatePresence mode="wait">
+          {view === 'packages' && (
+            <motion.div
+              key="packages"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-4"
             >
-              {pkg.current ? 'Trenutni paket' : pkg.recommended ? 'Zamenjaj paket' : 'Izberi'}
-              <ChevronRight className="w-4 h-4 ml-2" />
-            </Button>
-          </motion.div>
-        ))}
-      </motion.div>
+              {standardPackages.map((pkg, index) => (
+                <PackageCard
+                  key={pkg.name}
+                  {...pkg}
+                  onSelect={() => {
+                    toast.info(`Paket ${pkg.name} izbran`, {
+                      description: 'V MVP to prikaže samo obvestilo.',
+                    });
+                  }}
+                />
+              ))}
 
-      {/* Explanation */}
-      <motion.div
-        variants={itemVariants}
-        className="mt-6 p-4 rounded-2xl bg-secondary/50"
-      >
-        <p className="text-sm text-muted-foreground">
-          💡 <span className="font-medium">Zakaj Premium Light?</span><br />
-          Vaša povprečna uporaba (23h TV, 45GB internet) ne izkorišča polnega paketa Premium. 
-          S Premium Light dobite vse, kar potrebujete, in prihranite 96€ letno.
-        </p>
-      </motion.div>
-    </motion.div>
+              {/* Custom Package Card */}
+              <PackageCard
+                name="ZConnect Custom"
+                price={customPkg.price}
+                data={customPkg.data}
+                calls={customPkg.calls === 'neomejeno' ? '∞' : customPkg.calls}
+                features={[
+                  'Prilagodljiv vmesnik',
+                  'Ročni konfigurator',
+                  'AI predlogi paketov',
+                  'Vsi dodatki po izbiri',
+                ]}
+                isCustom
+                onSelect={() => setView('custom')}
+              />
+            </motion.div>
+          )}
+
+          {view === 'custom' && (
+            <motion.div
+              key="custom"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              {/* AI Suggestion */}
+              <div className="rounded-2xl p-5 gradient-card shadow-card">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold">AI Predlog</h3>
+                    <p className="text-sm text-muted-foreground">Opišite svoje navade</p>
+                  </div>
+                </div>
+
+                <Textarea
+                  value={aiDescription}
+                  onChange={(e) => setAiDescription(e.target.value)}
+                  placeholder="npr. Veliko igram igre, ob koncih tedna gledam nogomet, vsak dan poslušam glasbo..."
+                  className="bg-secondary border-border mb-3 min-h-[80px]"
+                />
+
+                <Button
+                  onClick={generateAISuggestion}
+                  disabled={!aiDescription.trim()}
+                  className="w-full gradient-primary text-primary-foreground shadow-glow"
+                >
+                  <Bot className="w-4 h-4 mr-2" />
+                  Predlagaj paket
+                </Button>
+
+                {showAiResult && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="mt-4 p-3 rounded-xl bg-success/20 border border-success/30"
+                  >
+                    <div className="flex items-center gap-2 text-success mb-1">
+                      <Check className="w-4 h-4" />
+                      <span className="font-medium">AI predlog pripravljen!</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Paket je bil prilagojen vašim potrebam. Preverite nastavitve spodaj.
+                    </p>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Manual Configurator */}
+              <div className="rounded-2xl p-5 gradient-card shadow-card">
+                <h3 className="font-bold text-lg mb-4">Ustvari svoj paket</h3>
+
+                {/* Data Selection */}
+                <div className="mb-5">
+                  <label className="text-sm font-medium mb-2 block">Podatki</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {dataOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => updateCustomPackage({ data: option.value })}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                          customPkg.data === option.value
+                            ? 'gradient-primary text-primary-foreground shadow-glow'
+                            : 'bg-secondary text-secondary-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Calls Selection */}
+                <div className="mb-5">
+                  <label className="text-sm font-medium mb-2 block">Klici</label>
+                  <Select
+                    value={customPkg.calls}
+                    onValueChange={(value) => updateCustomPackage({ calls: value })}
+                  >
+                    <SelectTrigger className="bg-secondary border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border">
+                      {callsOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Add-ons */}
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium">Dodatne storitve</h4>
+
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-secondary">
+                    <div className="flex items-center gap-3">
+                      <Tv className="w-5 h-5 text-primary" />
+                      <div>
+                        <p className="font-medium">TV paket</p>
+                        <p className="text-xs text-muted-foreground">+9,99 €/mesec</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={customPkg.tvPackage}
+                      onCheckedChange={(checked) => updateCustomPackage({ tvPackage: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-secondary">
+                    <div className="flex items-center gap-3">
+                      <Music className="w-5 h-5 text-accent" />
+                      <div>
+                        <p className="font-medium">Glasbeni paket</p>
+                        <p className="text-xs text-muted-foreground">+4,99 €/mesec</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={customPkg.musicPackage}
+                      onCheckedChange={(checked) => updateCustomPackage({ musicPackage: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-secondary">
+                    <div className="flex items-center gap-3">
+                      <Bot className="w-5 h-5 text-success" />
+                      <div>
+                        <p className="font-medium">Premium AI paket</p>
+                        <p className="text-xs text-muted-foreground">+2,99 €/mesec</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={customPkg.aiPackage}
+                      onCheckedChange={(checked) => updateCustomPackage({ aiPackage: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-secondary">
+                    <div className="flex items-center gap-3">
+                      <Gamepad2 className="w-5 h-5 text-warning" />
+                      <div>
+                        <p className="font-medium">Gaming paket</p>
+                        <p className="text-xs text-muted-foreground">+5,99 €/mesec</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={customPkg.gamingPackage}
+                      onCheckedChange={(checked) => updateCustomPackage({ gamingPackage: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-secondary">
+                    <div className="flex items-center gap-3">
+                      <Trophy className="w-5 h-5 text-primary" />
+                      <div>
+                        <p className="font-medium">Športni paket</p>
+                        <p className="text-xs text-muted-foreground">+7,99 €/mesec</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={customPkg.sportsPackage}
+                      onCheckedChange={(checked) => updateCustomPackage({ sportsPackage: checked })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="rounded-2xl p-5 gradient-primary shadow-glow">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-primary-foreground/80">Okvirna cena</span>
+                  <span className="text-3xl font-bold text-primary-foreground">
+                    {customPkg.price.toFixed(2)} €
+                  </span>
+                </div>
+                <p className="text-sm text-primary-foreground/80 mb-4">
+                  {getPackageSummary()}
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={resetPackage}
+                    variant="outline"
+                    className="flex-1 bg-transparent border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Ponastavi
+                  </Button>
+                  <Button
+                    onClick={saveCustomPackage}
+                    className="flex-1 bg-background text-primary hover:bg-background/90"
+                  >
+                    Shrani paket
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <BottomNav />
+    </div>
   );
-}
+};
